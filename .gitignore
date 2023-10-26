@@ -16,6 +16,8 @@ __pycache__
 imgui.ini
 output
 teaser_scripts/
+datasets/
+
 
 *.ply
 *.obj

@@ -1,0 +1,38 @@
+
+apt-get download libxinerama-dev
+mkdir pkgs
+dpkg -x libxinerama-dev_2%3a1.1.4-3_amd64.deb ./pkgs/
+
+apt-get download libxcursor-dev
+dpkg -x libxcursor-dev_1%3a1.2.0-2build4_amd64.deb ./pkgs/
+
+apt-get download libxi-dev
+dpkg -x libxi-dev_2%3a1.8-1build1_amd64.deb ./pkgs/
+
+apt-get download libglew-dev
+dpkg -x libglew-dev*.deb ./pkgs/
+rm *.deb 
+
+apt-get download libglew2.2
+dpkg -x libglew*.deb ./pkgs/
+
+apt-get download libxfixes-dev
+dpkg -x libxfixes-dev_*.deb ./pkgs/
+
+# for python development tools
+conda activate neus2
+pip install python-dev-tools
+conda install -c conda-forge libstdcxx-ng=12
+
+cmake . -B build -DGLEW_VERBOSE=ON \
+-DX11_Xinerama_INCLUDE_PATH=/mnt/kostas-graid/sw/envs/heguang/pkgs/usr/include/X11/extensions/ \
+-DX11_Xcursor_INCLUDE_PATH=/mnt/kostas-graid/sw/envs/heguang/pkgs/usr/include/X11/Xcursor \
+-DX11_Xi_INCLUDE_PATH=/mnt/kostas-graid/sw/envs/heguang/pkgs/usr/include/X11/extensions \
+-DGLEW_INCLUDE_DIR=/mnt/kostas-graid/sw/envs/heguang/pkgs/usr/include \
+-DGLEW_SHARED_LIBRARY_RELEASE=/mnt/kostas-graid/sw/envs/heguang/pkgs/usr/lib/x86_64-linux-gnu/libGLEW.so.2.2.0 \
+-DGLEW_STATIC_LIBRARY_RELEASE=/mnt/kostas-graid/sw/envs/heguang/pkgs/usr/lib/x86_64-linux-gnu/libGLEW.a \
+-DPython_EXECUTABLE=/mnt/kostas-graid/sw/envs/heguang/miniconda3/envs/neus2/bin/python3 
+
+export C_INCLUDE_PATH=/mnt/kostas-graid/sw/envs/heguang/pkgs/usr/include:$C_INCLUDE_PATH
+
+cmake --build build --config RelWithDebInfo -j

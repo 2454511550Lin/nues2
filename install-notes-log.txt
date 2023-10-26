@@ -1,0 +1,158 @@
+# Run Cmake cmake . -B build
+# Find the Xinerama package missing
+# Since no root access, do:
+
+apt-get download libxinerama-dev
+mkdir pkgs
+dpkg -x libxinerama-dev_2%3a1.1.4-3_amd64.deb ./pkgs/
+
+# add three environment variables to the ~/.bashrc
+code ~/.bashrc
+# append at the end of the ~/.bashrc, I think this step is not needed?
+export LD_LIBRARY_PATH="/mnt/kostas-graid/sw/envs/heguang/pkgs/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH"
+export CPATH="/mnt/kostas-graid/sw/envs/heguang/pkgs/usr/include:$CPATH"
+export PKG_CONFIG_PATH="/mnt/kostas-graid/sw/envs/heguang/pkgs/usr/lib/x86_64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH"
+
+# Run Cmake cmake . -B build, still cannot find Xinerama
+# mannualy add header file DIRECTORY when doing cmake, and it works
+cmake . -B build -DX11_Xinerama_INCLUDE_PATH=/mnt/kostas-graid/sw/envs/heguang/pkgs/usr/include/X11/extensions/
+
+# now Xcursor package also not install, redo the same process
+apt-get download libxcursor-dev
+dpkg -x libxcursor-dev_1%3a1.2.0-2build4_amd64.deb ./pkgs/
+# add path when doing cmake
+cmake . -B build \
+-DX11_Xinerama_INCLUDE_PATH=/mnt/kostas-graid/sw/envs/heguang/pkgs/usr/include/X11/extensions/ \
+-DX11_Xcursor_INCLUDE_PATH=/mnt/kostas-graid/sw/envs/heguang/pkgs/usr/include/X11/Xcursor
+
+# now for XInput
+apt-get download libxi-dev
+dpkg -x libxi-dev_2%3a1.8-1build1_amd64.deb ./pkgs/
+
+# for GLEW
+apt-get download libglew-dev
+dpkg -x libglew-dev*.deb
+
+# now the version does not MATCH
+
+CMake Error at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:230 (message):
+  Could NOT find GLEW (missing: GLEW_LIBRARIES) (found version "2.2.0")
+Call Stack (most recent call first):
+  /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:594 (_FPHSA_FAILURE_MESSAGE)
+  /usr/share/cmake-3.22/Modules/FindGLEW.cmake:215 (find_package_handle_standard_args)
+  CMakeLists.txt:170 (find_package)
+
+Now, eventaully, to handle this missing package for GLEW
+I have to gointo the CMakeLists.txt file to modify the way it find the GLOW path:
+Change:
+find_package(GLEW REQUIRED)
+To:
+set(GLEW_INCLUDE_DIRS "/mnt/kostas-graid/sw/envs/heguang/pkgs/usr/include")
+set(GLEW_LIBRARIES "/mnt/kostas-graid/sw/envs/heguang/pkgs/usr/lib/x86_64-linux-gnu/libGLEW.so")
+
+And run:
+cmake . -B build \
+-DX11_Xinerama_INCLUDE_PATH=/mnt/kostas-graid/sw/envs/heguang/pkgs/usr/include/X11/extensions/ \
+-DX11_Xcursor_INCLUDE_PATH=/mnt/kostas-graid/sw/envs/heguang/pkgs/usr/include/X11/Xcursor \
+-DX11_Xi_INCLUDE_PATH=/mnt/kostas-graid/sw/envs/heguang/pkgs/usr/include/X11/extensions
+
+This works without issues.
+
+Now proceed with:
+cmake --build build --config RelWithDebInfo -j
+
+The following error occurs:
+In file included from /mnt/kostas-graid/sw/envs/heguang/NeuS2/dependencies/glfw/src/x11_platform.h:49,
+                 from /mnt/kostas-graid/sw/envs/heguang/NeuS2/dependencies/glfw/src/internal.h:188,
+                 from /mnt/kostas-graid/sw/envs/heguang/NeuS2/dependencies/glfw/src/glx_context.c:30:
+/mnt/kostas-graid/sw/envs/heguang/pkgs/usr/include/X11/extensions/XInput2.h:33:10: fatal error: X11/extensions/Xfixes.h: No such file or directory
+   33 | #include <X11/extensions/Xfixes.h> /* PointerBarrier */
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~
+
+The error indicates that the header file Xfixes.h is missing. This header file is a part of the libxfixes-dev package (in Debian/Ubuntu systems). Just then download it:
+apt-get download libxfixes-dev
+dpkg -x libxfixes-dev_*.deb ./pkgs/
+Now we get the header file.
+
+Now temporarly export the path to the Xfixes.h as follow:
+
+export C_INCLUDE_PATH=/mnt/kostas-graid/sw/envs/heguang/pkgs/usr/include:$C_INCLUDE_PATH
+
+And re-run the 
+cmake --build build --config RelWithDebInfo -j
+
+Following error occurs: -----------------------------
+
+[ 92%] Built target ngp
+gmake[2]: *** No rule to make target '/mnt/kostas-graid/sw/envs/heguang/pkgs/usr/lib/x86_64-linux-gnu/libGLEW.so', needed by 'testbed'.  Stop.
+gmake[2]: *** Waiting for unfinished jobs....
+gmake[2]: *** No rule to make target '/mnt/kostas-graid/sw/envs/heguang/pkgs/usr/lib/x86_64-linux-gnu/libGLEW.so', needed by 'pyngp.cpython-311-x86_64-linux-gnu.so'.  Stop.
+gmake[2]: *** Waiting for unfinished jobs....
+[ 94%] Building CUDA object CMakeFiles/testbed.dir/src/main.cu.o
+[ 96%] Building CUDA object CMakeFiles/pyngp.dir/src/python_api.cu.o
+/mnt/kostas-graid/sw/envs/heguang/NeuS2/dependencies/pybind11/include/pybind11/detail/type_caster_base.h(448): error: pointer to incomplete class type "_frame" is not allowed
+
+/mnt/kostas-graid/sw/envs/heguang/NeuS2/dependencies/pybind11/include/pybind11/detail/type_caster_base.h(448): error: type name is not allowed
+
+/mnt/kostas-graid/sw/envs/heguang/NeuS2/dependencies/pybind11/include/pybind11/detail/type_caster_base.h(448): error: expected an expression
+
+/mnt/kostas-graid/sw/envs/heguang/NeuS2/dependencies/pybind11/include/pybind11/detail/type_caster_base.h(450): error: pointer to incomplete class type "_frame" is not allowed
+
+/mnt/kostas-graid/sw/envs/heguang/NeuS2/dependencies/pybind11/include/pybind11/detail/type_caster_base.h(450): error: type name is not allowed
+
+/mnt/kostas-graid/sw/envs/heguang/NeuS2/dependencies/pybind11/include/pybind11/detail/type_caster_base.h(450): error: expected an expression
+
+/mnt/kostas-graid/sw/envs/heguang/NeuS2/dependencies/pybind11/include/pybind11/detail/type_caster_base.h(451): error: pointer to incomplete class type "_frame" is not allowed
+
+/mnt/kostas-graid/sw/envs/heguang/NeuS2/dependencies/pybind11/include/pybind11/pybind11.h(2163): error: class "_ts" has no member "frame"
+
+/mnt/kostas-graid/sw/envs/heguang/NeuS2/dependencies/pybind11/include/pybind11/pybind11.h(2164): error: pointer to incomplete class type "_frame" is not allowed
+
+/mnt/kostas-graid/sw/envs/heguang/NeuS2/dependencies/pybind11/include/pybind11/pybind11.h(2165): error: pointer to incomplete class type "_frame" is not allowed
+
+/mnt/kostas-graid/sw/envs/heguang/NeuS2/dependencies/pybind11/include/pybind11/pybind11.h(2168): error: pointer to incomplete class type "_frame" is not allowed
+
+/mnt/kostas-graid/sw/envs/heguang/NeuS2/dependencies/pybind11/include/pybind11/pybind11.h(2168): error: pointer to incomplete class type "_frame" is not allowed
+
+12 errors detected in the compilation of "/mnt/kostas-graid/sw/envs/heguang/NeuS2/src/python_api.cu".
+gmake[2]: *** [CMakeFiles/pyngp.dir/build.make:76: CMakeFiles/pyngp.dir/src/python_api.cu.o] Error 1
+gmake[1]: *** [CMakeFiles/Makefile2:228: CMakeFiles/pyngp.dir/all] Error 2
+gmake[1]: *** Waiting for unfinished jobs....
+gmake[1]: *** [CMakeFiles/Makefile2:200: CMakeFiles/testbed.dir/all] Error 2
+gmake: *** [Makefile:91: all] Error 2
+
+---------------------------------------------------------------------------------------------------------
+
+try to add  the LD_LIBRARY_PATH environment variable includes the path to the library.
+
+export LD_LIBRARY_PATH=/mnt/kostas-graid/sw/envs/heguang/pkgs/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
+And in the CMakeLists.txt
+
+Change 
+target_link_libraries(ngp PUBLIC ${NGP_LIBRARIES} tiny-cuda-nn)
+to 
+target_link_libraries(ngp PUBLIC ${NGP_LIBRARIES} tiny-cuda-nn /mnt/kostas-graid/sw/envs/heguang/pkgs/usr/lib/x86_64-linux-gnu/libGLEW.so)
+
+Now remove all the build files and redo 
+cmake . -B build \
+-DX11_Xinerama_INCLUDE_PATH=/mnt/kostas-graid/sw/envs/heguang/pkgs/usr/include/X11/extensions/ \
+-DX11_Xcursor_INCLUDE_PATH=/mnt/kostas-graid/sw/envs/heguang/pkgs/usr/include/X11/Xcursor \
+-DX11_Xi_INCLUDE_PATH=/mnt/kostas-graid/sw/envs/heguang/pkgs/usr/include/X11/extensions \
+-DPython_EXECUTABLE=/mnt/kostas-graid/sw/envs/heguang/miniconda3/envs/neus2/bin/python3
+cmake --build build --config RelWithDebInfo -j
+
+Realize that we actually need 
+
+apt-get download libglew2.2
+mkdir ./glew
+dpkg -x libglew*.deb ./glew/
+so that 
+ls ./glew/usr/lib/x86_64-linux-gnu/
+libGLEW.so.2.2  libGLEW.so.2.2.0
+
+
+for missing 
+- import pyngp as ngp # noqa
+- ImportError: /mnt/kostas-graid/sw/envs/heguang/miniconda3/envs/neus2/bin/../lib/libstdc++.so.6: version `GLIBCXX_3.4.30' not found (required by /mnt/kostas-graid/sw/envs/heguang/NeuS2/build/pyngp.cpython-39-x86_64-linux-gnu.so)
+try
+conda install -c conda-forge libstdcxx-ng=12
